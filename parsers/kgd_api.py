@@ -1,54 +1,55 @@
-import aiohttp
-import asyncio
+import requests
 
-BASE_URL = "https://kgd.gov.kz/apps/services/culs-search-taxpayer/bin/"
+BASE_URL = "https://data.egov.kz/api/v4/"
 
-async def get_company_info_by_bin(bin_number: str) -> dict:
+# --- Поиск компании по БИН ---
+def search_by_bin(bin_number: str):
     """
-    Получает информацию о компании по БИН через официальный API КГД Казахстана.
+    Возвращает данные о компании по БИН из открытого источника KGD.
     """
-    url = f"{BASE_URL}{bin_number}"
+    url = f"{BASE_URL}kgd_ul/v4?bin={bin_number}&source=gov"
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if not data:
-                        return {"error": "Данные не найдены."}
-                    return parse_kgd_data(data)
-                else:
-                    return {"error": f"Ошибка API ({response.status})"}
-    except asyncio.TimeoutError:
-        return {"error": "Время ожидания запроса истекло."}
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if not data:
+            return {"error": "Компания с таким БИН не найдена."}
+        return data[0]
     except Exception as e:
-        return {"error": f"Ошибка при запросе: {str(e)}"}
+        return {"error": str(e)}
 
-
-def parse_kgd_data(data: dict) -> dict:
+# --- Поиск по названию компании ---
+def search_by_name(name: str, limit: int = 5):
     """
-    Преобразует исходный JSON от КГД в удобный формат.
+    Возвращает до 5 компаний, найденных по названию.
     """
+    url = f"{BASE_URL}kgd_ul/v4?ul_name__icontains={name}&source=gov"
     try:
-        result = data.get("content", [])[0]
-        return {
-            "БИН": result.get("bin", "-"),
-            "Наименование": result.get("name", "-"),
-            "Регион": result.get("region", "-"),
-            "Статус": result.get("taxpayerStatus", "-"),
-            "Дата регистрации": result.get("regDate", "-"),
-            "Риск": result.get("riskDegree", "-"),
-            "НДС": result.get("vatRegistrationStatus", "-"),
-            "Задолженность": result.get("taxArrears", "-"),
-        }
-    except Exception:
-        return {"error": "Ошибка обработки данных."}
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data[:limit] if data else [{"message": "Ничего не найдено"}]
+    except Exception as e:
+        return [{"error": str(e)}]
 
+# --- Проверка задолженности ---
+def get_tax_debt(bin_number: str):
+    """
+    Проверяет наличие налоговой задолженности компании по БИН.
+    """
+    url = f"{BASE_URL}kgd_tax_arrear/v4?bin={bin_number}&source=gov"
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if not data:
+            return {"status": "Нет задолженности"}
+        return {"status": "Есть задолженность", "details": data}
+    except Exception as e:
+        return {"error": str(e)}
 
-# Пример локального теста
 if __name__ == "__main__":
-    async def main():
-        bin_number = "200940021948"  # пример БИН
-        info = await get_company_info_by_bin(bin_number)
-        print(info)
-
-    asyncio.run(main())
+    # Примеры проверки
+    print(search_by_bin("201240025834"))
+    print(search_by_name("КазОйл"))
+    print(get_tax_debt("201240025834"))
