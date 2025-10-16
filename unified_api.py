@@ -1,49 +1,44 @@
 import aiohttp
-import logging
-import urllib.parse
-import os
 
-API_KEY = os.getenv("EGOV_API_KEY")  # твой ключ из .env
-BASE_URL = "https://data.egov.kz/api/v4"
+API_URL = "https://data.egov.kz/api/v4/gbd_ul/v2"
 
-# ID нужных наборов данных (dataset)
-DATASETS = {
-    "companies": "gbd_ul",             # Основные сведения о юр. лицах
-    "licenses": "reestr_licenziy",                 # Лицензии
-    "goszakup": "gosudarstvennye_zakupki",        # Госзакупки
-    "tax": "nalogovye_nachisleniya_i_platezhi"    # Налоги
-}
-
-async def fetch_json(session, url):
+async def search_company(name: str):
+    """Поиск компании по названию или БИН через API data.egov.kz"""
     try:
-        async with session.get(url) as response:
-            if response.status == 200:
-                return await response.json(content_type=None)
-            else:
-                logging.error(f"Ошибка {response.status} при загрузке {url}")
-                return None
+        async with aiohttp.ClientSession() as session:
+            params = {
+                "query": name,
+                "size": 1
+            }
+            async with session.get(API_URL, params=params, timeout=15) as resp:
+                if resp.status != 200:
+                    return f"⚠️ Ошибка подключения: {resp.status}"
+                
+                data = await resp.json()
+
+                if not data:
+                    return "❌ Компания не найдена."
+
+                company = data[0]
+
+                # Обрабатываем возможные варианты ключей
+                name_ru = company.get("name_ru") or company.get("name_kz") or "Не найдено"
+                bin_code = company.get("bin", "Не найдено")
+                address = company.get("legal_address", "-")
+                reg_date = company.get("reg_date", "-")
+                activity = company.get("okved_name", "-")
+                director = company.get("fio_rykovoditelya", "-")
+
+                result = (
+                    f"🏢 <b>Название:</b> {name_ru}\n"
+                    f"📇 <b>БИН:</b> {bin_code}\n"
+                    f"📍 <b>Адрес:</b> {address}\n"
+                    f"📅 <b>Регистрация:</b> {reg_date[:10] if reg_date != '-' else '-'}\n"
+                    f"💼 <b>Вид деятельности:</b> {activity}\n"
+                    f"👤 <b>Руководитель:</b> {director}"
+                )
+
+                return result
+
     except Exception as e:
-        logging.error(f"Ошибка при загрузке {url}: {e}")
-        return None
-
-
-async def get_company_data(query: str):
-    """Ищет данные компании по БИН или названию"""
-    encoded_query = urllib.parse.quote(query)
-    async with aiohttp.ClientSession() as session:
-        dataset = DATASETS["companies"]
-        url = f"{BASE_URL}/{dataset}?apiKey={API_KEY}&query={encoded_query}"
-        data = await fetch_json(session, url)
-
-        if not data or len(data) == 0:
-            return None
-
-        item = data[0]
-        return {
-            "name": item.get("naimenovanie_rus", "Не найдено"),
-            "bin": item.get("bin", "-"),
-            "address": item.get("yur_adres_rus", "-"),
-            "registration_date": item.get("data_registracii", "-"),
-            "oked_name": item.get("vid_deyatelnosti", "-"),
-            "director": item.get("fio_rukovoditelya", "-")
-        }
+        return f"⚠️ Ошибка: {e}"
