@@ -9,7 +9,7 @@ from aiohttp import web
 
 # Импортируем парсеры — эти модули будут в папке parsers/
 from parsers.stat_api import search_by_name, get_company_by_bin
-from parsers.kgd_api import get_tax_info
+from parsers.kgd_api import search_by_bin, search_by_name, get_tax_debt
 from parsers.court_api import get_court_cases
 from parsers.zakup_api import get_goszakup_info
 from parsers.licenses_api import get_licenses_info
