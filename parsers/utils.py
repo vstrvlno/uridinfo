@@ -1,6 +1,16 @@
 # parsers/utils.py
 
-def format_full_card(stat, kgd, zakup, lic):
+def is_bin(text: str) -> bool:
+    """
+    Проверяет, является ли строка БИН (12 цифр).
+    """
+    return text.isdigit() and len(text) == 12
+
+
+def format_full_card(stat, kgd, court, zakup, lic):
+    """
+    Формирует подробную карточку компании с данными из всех источников.
+    """
     text = f"🏢 *{stat.get('name', 'Не найдено')}*\n\n"
     text += f"📍 Адрес: {stat.get('address', '-')}\n"
     text += f"📆 Регистрация: {stat.get('registration_date', '-')}\n"
@@ -11,6 +21,18 @@ def format_full_card(stat, kgd, zakup, lic):
     text += f"🚨 Задолженность: {kgd.get('debt', '-')}\n"
     text += f"⚠️ Риск: {kgd.get('risk_level', '-')}\n\n"
 
-    text += f"📄 Госзакупки: {len(zakup)}\n"
-    text += f"🧾 Лицензии: {len(lic)}\n"
+    # Судебные дела
+    if isinstance(court, list) and court:
+        text += "⚖️ Судебные дела:\n"
+        for c in court[:3]:  # максимум 3 дела для краткости
+            num = c.get("Номер дела", "-")
+            cat = c.get("Категория", "-")
+            date = c.get("Дата", "-")
+            text += f"• {num} ({cat}, {date})\n"
+    else:
+        text += "⚖️ Судебные дела: не найдены\n"
+
+    text += "\n📄 Госзакупки: " + str(len(zakup) if isinstance(zakup, list) else 0)
+    text += "\n🧾 Лицензии: " + str(len(lic) if isinstance(lic, list) else 0)
+
     return text
