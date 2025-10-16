@@ -36,4 +36,10 @@ def parse_case(case: dict) -> dict:
     Преобразует данные судебного дела в удобный формат.
     """
     return {
-        "Номер дела": case.get("
+        "Номер дела": case.get("caseNumber", ""),
+        "Суд": case.get("courtName", ""),
+        "Дата начала": case.get("startDate", ""),
+        "Состояние": case.get("status", ""),
+        "Стороны": case.get("parties", []),
+        "Ссылка": case.get("url", "")
+    }
