@@ -1,81 +1,49 @@
 import aiohttp
-import asyncio
 import logging
+import urllib.parse
 import os
 
-EGOV_TOKEN = os.getenv("EGOV_TOKEN")
+API_KEY = os.getenv("EGOV_API_KEY")  # твой ключ из .env
+BASE_URL = "https://data.egov.kz/api/v4"
 
-BASE_URLS = [
-    # Главный источник — API data.egov.kz
-    f"https://data.egov.kz/api/v4/companies/v1?access_token={EGOV_TOKEN}",
-    # При желании можно добавить сюда другие API с JSON данными
-]
-
+# ID нужных наборов данных (dataset)
+DATASETS = {
+    "companies": "yuridicheskie_lica",             # Основные сведения о юр. лицах
+    "licenses": "reestr_licenziy",                 # Лицензии
+    "goszakup": "gosudarstvennye_zakupki",        # Госзакупки
+    "tax": "nalogovye_nachisleniya_i_platezhi"    # Налоги
+}
 
 async def fetch_json(session, url):
-    """Асинхронная загрузка JSON"""
     try:
-        async with session.get(url, timeout=15) as response:
+        async with session.get(url) as response:
             if response.status == 200:
-                return await response.json()
+                return await response.json(content_type=None)
             else:
-                logging.warning(f"Ошибка {response.status} при запросе {url}")
+                logging.error(f"Ошибка {response.status} при загрузке {url}")
                 return None
     except Exception as e:
         logging.error(f"Ошибка при загрузке {url}: {e}")
         return None
 
 
-async def search_company(name: str):
-    """Поиск компании по названию через все API"""
+async def get_company_data(query: str):
+    """Ищет данные компании по БИН или названию"""
+    encoded_query = urllib.parse.quote(query)
     async with aiohttp.ClientSession() as session:
-        for base_url in BASE_URLS:
-            url = f"{base_url}&query={name}"
-            data = await fetch_json(session, url)
-            if not data:
-                continue
+        dataset = DATASETS["companies"]
+        url = f"{BASE_URL}/{dataset}?apiKey={API_KEY}&query={encoded_query}"
+        data = await fetch_json(session, url)
 
-            # data может быть списком или словарем
-            companies = data if isinstance(data, list) else data.get("companies", [])
-            if not companies:
-                continue
+        if not data or len(data) == 0:
+            return None
 
-            for company in companies:
-                if name.lower() in str(company).lower():
-                    return format_company_info(company)
-
-    return None
-
-
-def format_company_info(company: dict) -> str:
-    """Форматирует данные компании"""
-    name = company.get("name", "—")
-    bin_iin = company.get("bin", company.get("iin", "—"))
-    reg_date = company.get("registration_date", "—")
-    status = company.get("status", "—")
-    address = company.get("address", "—")
-    head = company.get("head", "—")
-    risk = company.get("risk_level", "—")
-    taxpayer = "Да" if company.get("nds_payer") else "Нет"
-    activity = company.get("okved", "—")
-
-    return (
-        f"🏢 <b>{name}</b>\n"
-        f"БИН/ИИН: <code>{bin_iin}</code>\n"
-        f"📅 Дата регистрации: {reg_date}\n"
-        f"📍 Адрес: {address}\n"
-        f"👔 Руководитель: {head}\n"
-        f"💼 Статус: {status}\n"
-        f"📊 Плательщик НДС: {taxpayer}\n"
-        f"⚖️ Уровень риска: {risk}\n"
-        f"🔹 Вид деятельности: {activity}"
-    )
-
-
-# Тест ручного запуска
-if __name__ == "__main__":
-    async def main():
-        result = await search_company("КазОйлГрупп-2009")
-        print(result or "Компания не найдена")
-
-    asyncio.run(main())
+        item = data[0]
+        return {
+            "name": item.get("naimenovanie_rus", "Не найдено"),
+            "bin": item.get("bin", "-"),
+            "address": item.get("yur_adres_rus", "-"),
+            "registration_date": item.get("data_registracii", "-"),
+            "oked_name": item.get("vid_deyatelnosti", "-"),
+            "director": item.get("fio_rukovoditelya", "-")
+        }
