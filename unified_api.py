@@ -8,7 +8,7 @@ BASE_URL = "https://data.egov.kz/api/v4"
 
 # ID нужных наборов данных (dataset)
 DATASETS = {
-    "companies": "yuridicheskie_lica",             # Основные сведения о юр. лицах
+    "companies": "gbd_ul",             # Основные сведения о юр. лицах
     "licenses": "reestr_licenziy",                 # Лицензии
     "goszakup": "gosudarstvennye_zakupki",        # Госзакупки
     "tax": "nalogovye_nachisleniya_i_platezhi"    # Налоги
