@@ -1,6 +1,6 @@
 # parsers/utils.py
 
-def format_company_card(stat, kgd, zakup, lic):
+def format_full_card(stat, kgd, zakup, lic):
     text = f"🏢 *{stat.get('name', 'Не найдено')}*\n\n"
     text += f"📍 Адрес: {stat.get('address', '-')}\n"
     text += f"📆 Регистрация: {stat.get('registration_date', '-')}\n"
