@@ -7,7 +7,7 @@ from aiogram.types import Message
 from aiohttp import web
 from dotenv import load_dotenv
 
-import unified_api  # импортируем наш универсальный парсер
+import parsers.unified_api  # импортируем наш универсальный парсер
 
 # --- Настройка логов и окружения ---
 logging.basicConfig(level=logging.INFO)
