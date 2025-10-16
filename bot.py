@@ -129,7 +129,7 @@ async def send_full_card(chat_id: int, basic_info: dict):
     bin_ = basic_info.get("bin") or basic_info.get("BIN")
     # Запросы к доп. источникам (если модуль не вернёт данные — вернётся пустая структура)
     tasks = [
-        get_tax_info(bin_),
+        get_tax_debt(bin_),
         get_court_cases(bin_),
         get_goszakup_info(bin_),
         get_licenses_info(bin_),
