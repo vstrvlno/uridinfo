@@ -1,7 +1,7 @@
 import aiohttp
 import asyncio
 
-BASE_URL = "https://office.sud.kz/api/process/search"
+BASE_URL = "https://data.egov.kz/api/v4/court_cases/v4"
 
 async def get_court_cases(query: str, limit: int = 5) -> list:
     """
