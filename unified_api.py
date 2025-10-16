@@ -2,7 +2,7 @@ import aiohttp
 
 API_URL = "https://data.egov.kz/api/v4/gbd_ul/v2"
 
-async def search_company(name: str):
+async def get_company_data(name: str):
     """Поиск компании по названию или БИН через API data.egov.kz"""
     try:
         async with aiohttp.ClientSession() as session:
