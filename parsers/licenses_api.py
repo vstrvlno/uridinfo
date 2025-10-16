@@ -5,7 +5,7 @@ async def get_licenses_info(query: str):
     """
     Получает информацию о лицензиях компании по БИН или названию.
     """
-    url = f"https://elicense.kz/api/clients/search?text={query}&size=5"
+    url = f"https://data.egov.kz/api/v4/gov_licenses/v4"
     headers = {"Accept": "application/json"}
 
     async with aiohttp.ClientSession() as session:
