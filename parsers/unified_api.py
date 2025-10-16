@@ -1,127 +1,81 @@
 import aiohttp
 import asyncio
-import json
+import logging
+import os
 
-BASE_URL = "https://data.egov.kz/api/v4"
+EGOV_TOKEN = os.getenv("EGOV_TOKEN")
 
-# --- Список API наборов данных ---
-DATASETS = {
-    "company": "reestr_yuridicheskikh_lits/v1",
-    "nds": "nds_registraciya/v1",
-    "license": "licenzii_i_razresheniya/v1",
-    "court": "sudebnye_dela/v1",
-    "exec": "ispolnitelnoe_proizvodstvo/v1",
-    "zakup": "gos_zakup_uchastniki/v1",
-    "stats": "stat_predpriyatiya/v1"
-}
+BASE_URLS = [
+    # Главный источник — API data.egov.kz
+    f"https://data.egov.kz/api/v4/companies/v1?access_token={EGOV_TOKEN}",
+    # При желании можно добавить сюда другие API с JSON данными
+]
 
 
 async def fetch_json(session, url):
-    """Асинхронно получает JSON с API data.egov.kz"""
+    """Асинхронная загрузка JSON"""
     try:
         async with session.get(url, timeout=15) as response:
             if response.status == 200:
-                data = await response.text()
-                try:
-                    return json.loads(data)
-                except json.JSONDecodeError:
-                    return None
+                return await response.json()
             else:
-                print(f"Ошибка: {url} — {response.status}")
+                logging.warning(f"Ошибка {response.status} при запросе {url}")
                 return None
     except Exception as e:
-        print(f"Ошибка при запросе {url}: {e}")
+        logging.error(f"Ошибка при загрузке {url}: {e}")
         return None
 
 
-async def search_company(query):
-    """
-    Универсальный поиск по названию или БИН компании.
-    Возвращает объединённый результат из всех доступных API.
-    """
+async def search_company(name: str):
+    """Поиск компании по названию через все API"""
     async with aiohttp.ClientSession() as session:
-        results = {}
-
-        for key, endpoint in DATASETS.items():
-            url = f"{BASE_URL}/{endpoint}?source=" + json.dumps({
-                "query": {
-                    "bool": {
-                        "should": [
-                            {"match_phrase": {"bin": query}},
-                            {"match_phrase": {"company_name": query}},
-                            {"match_phrase": {"name": query}}
-                        ]
-                    }
-                },
-                "size": 5
-            }, ensure_ascii=False)
-
+        for base_url in BASE_URLS:
+            url = f"{base_url}&query={name}"
             data = await fetch_json(session, url)
-            results[key] = data if data else []
+            if not data:
+                continue
 
-        return results
+            # data может быть списком или словарем
+            companies = data if isinstance(data, list) else data.get("companies", [])
+            if not companies:
+                continue
 
+            for company in companies:
+                if name.lower() in str(company).lower():
+                    return format_company_info(company)
 
-def format_result(data):
-    """Форматирует результат для вывода пользователю в Telegram."""
-    text = "🏢 *Информация о компании:*\n\n"
-
-    # --- Основные сведения ---
-    company = data.get("company", [])
-    if company:
-        c = company[0]
-        text += f"**{c.get('name', '-') }**\n"
-        text += f"БИН: `{c.get('bin', '-')}`\n"
-        text += f"Адрес: {c.get('address', '-')}\n"
-        text += f"Дата регистрации: {c.get('registration_date', '-')}\n"
-        text += f"Руководитель: {c.get('director', '-')}\n\n"
-    else:
-        text += "❌ Компания не найдена\n\n"
-
-    # --- НДС ---
-    nds = data.get("nds", [])
-    if nds:
-        n = nds[0]
-        text += f"💰 *НДС:* {n.get('status', '-')}\n\n"
-
-    # --- Судебные дела ---
-    court = data.get("court", [])
-    if court:
-        text += f"⚖️ Судебные дела: {len(court)}\n"
-        for c in court[:3]:
-            text += f"  • {c.get('case_number', '-')}: {c.get('case_status', '-')}\n"
-        text += "\n"
-
-    # --- Исполнительные производства ---
-    execs = data.get("exec", [])
-    if execs:
-        text += f"🔒 Исполнительные производства: {len(execs)}\n\n"
-
-    # --- Госзакупки ---
-    zakup = data.get("zakup", [])
-    if zakup:
-        text += f"📄 Госзакупки: {len(zakup)} записей\n\n"
-
-    # --- Лицензии ---
-    lic = data.get("license", [])
-    if lic:
-        text += f"🧾 Лицензии: {len(lic)}\n\n"
-
-    # --- Статистика ---
-    stats = data.get("stats", [])
-    if stats:
-        s = stats[0]
-        text += f"📊 Размер предприятия: {s.get('company_size', '-')}\n"
-        text += f"📈 Оборот: {s.get('turnover', '-')}\n\n"
-
-    return text
+    return None
 
 
-# --- Тест локально ---
+def format_company_info(company: dict) -> str:
+    """Форматирует данные компании"""
+    name = company.get("name", "—")
+    bin_iin = company.get("bin", company.get("iin", "—"))
+    reg_date = company.get("registration_date", "—")
+    status = company.get("status", "—")
+    address = company.get("address", "—")
+    head = company.get("head", "—")
+    risk = company.get("risk_level", "—")
+    taxpayer = "Да" if company.get("nds_payer") else "Нет"
+    activity = company.get("okved", "—")
+
+    return (
+        f"🏢 <b>{name}</b>\n"
+        f"БИН/ИИН: <code>{bin_iin}</code>\n"
+        f"📅 Дата регистрации: {reg_date}\n"
+        f"📍 Адрес: {address}\n"
+        f"👔 Руководитель: {head}\n"
+        f"💼 Статус: {status}\n"
+        f"📊 Плательщик НДС: {taxpayer}\n"
+        f"⚖️ Уровень риска: {risk}\n"
+        f"🔹 Вид деятельности: {activity}"
+    )
+
+
+# Тест ручного запуска
 if __name__ == "__main__":
     async def main():
-        query = "КазОйлГрупп"
-        data = await search_company(query)
-        print(format_result(data))
+        result = await search_company("КазОйлГрупп-2009")
+        print(result or "Компания не найдена")
 
     asyncio.run(main())
