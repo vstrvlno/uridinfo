@@ -1,6 +1,6 @@
 import requests
 
-BASE_URL = "https://data.egov.kz/api/v4/"
+BASE_URL = "https://data.egov.kz/api/v4/gbd_ul/v4"
 
 # --- Поиск компании по БИН ---
 def search_by_bin(bin_number: str):
